@@ -1,0 +1,15 @@
+services:
+  db-rest:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: kahoot_dev
+    ports:
+      - "5431:5432"
+    volumes:
+      - db_rest_data:/var/lib/postgresql/data
+
+volumes:
+  db_rest_data:

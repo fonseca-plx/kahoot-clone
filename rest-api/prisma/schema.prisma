@@ -1,0 +1,48 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  createdAt DateTime @default(now())
+  quizzes   Quiz[]   @relation("AuthorQuizzes")
+}
+
+model Quiz {
+  id        String     @id @default(uuid())
+  title     String
+  description String?
+  authorId  String
+  author    User       @relation(fields: [authorId], references: [id], name: "AuthorQuizzes")
+  questions Question[]
+  rooms     Room[]
+  createdAt DateTime   @default(now())
+}
+
+model Question {
+  id               String  @id @default(uuid())
+  quizId           String
+  quiz             Quiz    @relation(fields: [quizId], references: [id])
+  text             String
+  choices          String[]    // array of strings
+  correctIndex     Int
+  timeLimitSeconds Int     @default(10)
+}
+
+model Room {
+  id        String   @id @default(uuid())
+  code      String   @unique   // code to join the room
+  quizId    String
+  quiz      Quiz     @relation(fields: [quizId], references: [id])
+  title     String?
+  status    String   @default("waiting")
+  createdAt DateTime @default(now())
+  // players are ephemeral (managed in-memory by WS server), but we keep room meta here
+}
