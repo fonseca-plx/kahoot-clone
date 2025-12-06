@@ -7,7 +7,8 @@ import {
   getRoomState,
   createRoomState,
   listPlayers,
-  resetAnswers
+  resetAnswers,
+  removePlayer
 } from "../services/roomManager";
 
 import { computePoints } from "../utils/scoring";
@@ -38,14 +39,23 @@ export function registerGameEvents(io: Server) {
 async function onJoinRoom(io: Server, socket: Socket, payload: any) {
   const idOrCode = payload.roomId ?? payload.code;
   const displayName = payload.displayName;
-  if (!idOrCode) return socket.emit("error", { message: "roomId or code required" });
+  
+  if (!idOrCode) {
+    return socket.emit("error", { message: "roomId or code required" });
+  }
+  
+  if (!displayName) {
+    return socket.emit("error", { message: "displayName required" });
+  }
 
   // Recupera ou cria estado da sala
   let roomState = getRoomState(idOrCode);
 
   if (!roomState) {
     const room = await getRoom(idOrCode);
-    if (!room) return socket.emit("error", { message: "Room not found" });
+    if (!room) {
+      return socket.emit("error", { message: "Room not found" });
+    }
 
     roomState = createRoomState(room.id, room.quizId, room.code);
   }
@@ -72,10 +82,18 @@ async function onJoinRoom(io: Server, socket: Socket, payload: any) {
 
 async function onHostStart(io: Server, socket: Socket, roomId: string) {
   const roomState = getRoomState(roomId);
-  if (!roomState) return socket.emit("error", { message: "room not found" });
+  if (!roomState) {
+    return socket.emit("error", { message: "room not found" });
+  }
 
   const quiz = await getQuiz(roomState.quizId);
-  if (!quiz) return socket.emit("error", { message: "quiz not found" });
+  if (!quiz) {
+    return socket.emit("error", { message: "quiz not found" });
+  }
+
+  if (!quiz.questions || quiz.questions.length === 0) {
+    return socket.emit("error", { message: "quiz has no questions" });
+  }
 
   roomState.status = "running";
   roomState.questionIndex = 0;
@@ -90,6 +108,10 @@ function startNextQuestion(io: Server, room: RoomState, quiz: any) {
   }
 
   const q = quiz.questions[room.questionIndex];
+  if (!q) {
+    finishGame(io, room);
+    return;
+  }
 
   room.currentQuestion = q;
   room.currentQuestionStart = Date.now();
@@ -110,16 +132,24 @@ function startNextQuestion(io: Server, room: RoomState, quiz: any) {
 }
 
 function endQuestion(io: Server, room: RoomState, quiz: any) {
+  if (room.questionTimer) {
+    clearTimeout(room.questionTimer);
+    room.questionTimer = null;
+  }
+
   io.to(`room:${room.roomId}`).emit("game:question_end", {
-    questionId: room.currentQuestion.id
+    questionId: room.currentQuestion?.id,
+    correctIndex: room.currentQuestion?.correctIndex
   });
 
-  setTimeout(() => startNextQuestion(io, room, quiz), 700);
+  // Pequeno delay antes da próxima pergunta para mostrar resultado
+  setTimeout(() => startNextQuestion(io, room, quiz), 3000);
 }
 
 function onPlayerAnswer(io: Server, socket: Socket, payload: any) {
   const { roomId, questionId, selectedIndex, timeMs } = payload;
   const room = getRoomState(roomId);
+  
   if (!room) return;
   if (room.status !== "running") return;
 
@@ -139,15 +169,25 @@ function onPlayerAnswer(io: Server, socket: Socket, payload: any) {
 
   socket.emit("game:answer_result", {
     correct: isCorrect,
-    points
+    points,
+    correctIndex: question.correctIndex
   });
 
   broadcastLeaderboard(io, room);
 
+  // Se todos responderam, encerra a questão antecipadamente
   const allAnswered = listPlayers(room).every(p => p.answeredCurrent);
   if (allAnswered && room.questionTimer) {
     clearTimeout(room.questionTimer);
-    endQuestion(io, room, { questions: [] });
+    room.questionTimer = null;
+    
+    // Pequeno delay para todos verem seus resultados
+    setTimeout(() => {
+      io.to(`room:${room.roomId}`).emit("game:question_end", {
+        questionId: question.id,
+        correctIndex: question.correctIndex
+      });
+    }, 1000);
   }
 }
 
@@ -171,6 +211,11 @@ function broadcastLeaderboard(io: Server, room: RoomState) {
 
 function finishGame(io: Server, room: RoomState) {
   room.status = "finished";
+  
+  if (room.questionTimer) {
+    clearTimeout(room.questionTimer);
+    room.questionTimer = null;
+  }
 
   const leaderboard = listPlayers(room)
     .map(p => ({ playerId: p.playerId, displayName: p.displayName, score: p.score }))
@@ -180,19 +225,25 @@ function finishGame(io: Server, room: RoomState) {
 }
 
 function onDisconnect(io: Server, socket: Socket) {
-  // remover jogador de todas as salas
-  for (const room of Array.from((global as any).rooms ?? [])) {}
-
-  // Apenas remoção bruta simples:
-  for (const room of (global as any).rooms?.values?.() ?? []) {}
-
-  // Método simples com roomManager:
-  for (const room of (global as any).rooms?.values?.() ?? []) {}
-
-  // Melhor implementação:
-  // Vasculha rooms para encontrar o jogador
-  const allRooms = (require("../services/roomManager") as any).__proto__.constructor.rooms;
-  // Porém deixaremos simples: fazer scan manual no map
-
   console.log("[WS] disconnected:", socket.id);
+  
+  // Importa o map de rooms diretamente
+  const roomManager = require("../services/roomManager");
+  
+  // Procura o jogador em todas as salas
+  for (const room of roomManager.getAllRooms()) {
+    if (room.players.has(socket.id)) {
+      removePlayer(room, socket.id);
+      console.log(`[WS] Player removed from room ${room.roomId}`);
+      
+      // Notifica outros jogadores
+      broadcastPlayers(io, room);
+      
+      // Se a sala ficou vazia e não está em jogo, pode limpar
+      if (room.players.size === 0 && room.status === "waiting") {
+        roomManager.deleteRoom(room.roomId);
+        console.log(`[WS] Empty room ${room.roomId} deleted`);
+      }
+    }
+  }
 }

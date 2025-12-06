@@ -43,3 +43,11 @@ export function resetAnswers(room: RoomState) {
 export function listPlayers(room: RoomState) {
   return Array.from(room.players.values());
 }
+
+export function getAllRooms(): RoomState[] {
+  return Array.from(rooms.values());
+}
+
+export function deleteRoom(roomId: string) {
+  rooms.delete(roomId);
+}
