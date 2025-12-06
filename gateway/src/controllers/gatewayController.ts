@@ -1,0 +1,137 @@
+import { Request, Response } from "express";
+import restProxy from "../services/restProxyService";
+import { makeRoomLinks, makeQuizLinks, makeUserLinks } from "../utils/hateoas";
+
+export default class GatewayController {
+
+  static async createUser(req: Request, res: Response) {
+    try {
+      const data = await restProxy.createUser(req.body);
+      const user = data.user ?? data;
+      res.status(201).json({ user, _links: makeUserLinks(user) });
+    } catch (err: any) {
+      res.status(err.response?.status || 500).json({ error: err.message });
+    }
+  }
+
+  static async listUsers(req: Request, res: Response) {
+    try {
+      const data = await restProxy.listUsers();
+      const users = Array.isArray(data) ? data : data.users ?? data;
+      res.json(users.map((user: any) => ({ user, _links: makeUserLinks(user) })));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  static async getUser(req: Request, res: Response) {
+    try {
+      const id = req.params.id as string;
+      const data = await restProxy.getUser(id);
+      const user = data.user ?? data;
+      res.json({ user, _links: makeUserLinks(user) });
+    } catch (err: any) {
+      res.status(err.response?.status || 500).json({ error: err.message });
+    }
+  }
+
+  static async createQuiz(req: Request, res: Response) {
+    try {
+      const data = await restProxy.createQuiz(req.body);
+      const quiz = data.quiz ?? data;
+      res.status(201).json({ quiz, _links: makeQuizLinks(quiz) });
+    } catch (err: any) {
+      res.status(err.response?.status || 500).json({ error: err.message });
+    }
+  }
+  
+  static async listQuizzes(req: Request, res: Response) {
+    try {
+      const data = await restProxy.listQuizzes();
+      const quizzes = Array.isArray(data) ? data : data.quizzes ?? data;
+      res.json(quizzes.map((quizz: any) => ({ quiz: quizz, _links: makeQuizLinks(quizz) })));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  static async getQuiz(req: Request, res: Response) {
+    try {
+      const id = req.params.id as string;
+      const data = await restProxy.getQuiz(id);
+      const quiz = data.quiz ?? data;
+      res.json({ quiz, _links: makeQuizLinks(quiz) });
+    } catch (err: any) {
+      res.status(err.response?.status || 500).json({ error: err.message });
+    }
+  }
+
+  static async createRoom(req: Request, res: Response) {
+    try {
+      const data = await restProxy.createRoom(req.body);
+      const room = data.room ?? data;
+
+      const links = {
+        ...makeRoomLinks(room),
+        wsUrl: { href: process.env.WS_URL ?? "http://localhost:4000" }
+      };
+
+      res.status(201).json({ room, _links: links });
+    } catch (err: any) {
+      res.status(err.response?.status || 500).json({ error: err.message });
+    }
+  }
+
+  static async listRooms(req: Request, res: Response) {
+    try {
+      const data = await restProxy.listRooms();
+      const rooms = Array.isArray(data) ? data : data.rooms ?? data;
+
+      res.json(
+        rooms.map((room: any) => ({
+          room: room,
+          _links: { 
+            ...makeRoomLinks(room),
+            wsUrl: { href: process.env.WS_URL ?? "http://localhost:4000" }
+          }
+        }))
+      );
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  static async getRoom(req: Request, res: Response) {
+    try {
+      const id = req.params.id as string;
+      const data = await restProxy.getRoomById(id);
+      const room = data.room ?? data;
+
+      const links = {
+        ...makeRoomLinks(room),
+        wsUrl: { href: process.env.WS_URL ?? "http://localhost:4000" }
+      };
+
+      res.json({ room, _links: links });
+    } catch (err: any) {
+      res.status(err.response?.status || 500).json({ error: err.message });
+    }
+  }
+
+  static async getRoomByCode(req: Request, res: Response) {
+    try {
+      const code = req.params.code as string;
+      const data = await restProxy.getRoomByCode(code);
+      const room = data.room ?? data;
+
+      const links = {
+        ...makeRoomLinks(room),
+        wsUrl: { href: process.env.WS_URL ?? "http://localhost:4000" }
+      };
+
+      res.json({ room, _links: links });
+    } catch (err: any) {
+      res.status(err.response?.status || 500).json({ error: err.message });
+    }
+  }
+}
