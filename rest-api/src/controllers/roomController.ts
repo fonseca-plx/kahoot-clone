@@ -20,6 +20,13 @@ export const getRoom = async (req: Request, res: Response) => {
   res.json({ room, _links: makeRoomLinks(room) });
 };
 
+export const getRoomByCode = async (req: Request, res: Response) => {
+  const code = req.params.code as string;
+  const room = await roomService.getRoom({ code });
+  if (!room) return res.status(404).json({ error: "Room not found" });
+  res.json({ room, _links: makeRoomLinks(room) });
+};
+
 export const listRooms = async (req: Request, res: Response) => {
   const rooms = await roomService.listRooms();
   res.json(rooms.map((r:any) => ({ room: r, _links: makeRoomLinks(r) })));

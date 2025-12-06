@@ -102,4 +102,35 @@ router.get("/", roomController.listRooms);
  */
 router.get("/:id", roomController.getRoom);
 
+/**
+ * @swagger
+ * /rooms/code/{code}:
+ *   get:
+ *     tags: [Rooms]
+ *     summary: Get room by code
+ *     description: Retrieves a room using its join code instead of UUID
+ *     parameters:
+ *       - in: path
+ *         name: code
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Room join code
+ *         example: "ABC123"
+ *     responses:
+ *       200:
+ *         description: Room found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/RoomResponse'
+ *       404:
+ *         description: Room not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.get("/code/:code", roomController.getRoomByCode);
+
 export default router;

@@ -6,7 +6,12 @@ console.log(`[REST Client] Base URL: ${REST_BASE}`);
 
 export async function getRoom(idOrCode: string) {
   try {
-    const response = await axios.get(`${REST_BASE}/rooms/${idOrCode}`);
+    const isUUID = idOrCode.includes("-");
+    const endpoint = isUUID 
+      ? `${REST_BASE}/rooms/${idOrCode}` 
+      : `${REST_BASE}/rooms/code/${idOrCode}`;
+    
+    const response = await axios.get(endpoint);
     console.log(`[REST] Room fetched: ${idOrCode}`);
     return response.data.room;
   } catch (error: any) {
