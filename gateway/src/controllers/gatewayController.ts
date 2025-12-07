@@ -49,7 +49,7 @@ export default class GatewayController {
     try {
       const data = await restProxy.listQuizzes();
       const quizzes = Array.isArray(data) ? data : data.quizzes ?? data;
-      res.json(quizzes.map((quizz: any) => ({ quiz: quizz, _links: makeQuizLinks(quizz) })));
+      res.json(quizzes.map((quiz: any) => ({ quiz, _links: makeQuizLinks(quiz) })));
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -70,13 +70,12 @@ export default class GatewayController {
     try {
       const data = await restProxy.createRoom(req.body);
       const room = data.room ?? data;
+      const wsUrl = process.env.WS_URL || "http://localhost:4000";
 
-      const links = {
-        ...makeRoomLinks(room),
-        wsUrl: { href: process.env.WS_URL ?? "http://localhost:4000" }
-      };
-
-      res.status(201).json({ room, _links: links });
+      res.status(201).json({ 
+        room, 
+        _links: makeRoomLinks(room, wsUrl) 
+      });
     } catch (err: any) {
       res.status(err.response?.status || 500).json({ error: err.message });
     }
@@ -86,14 +85,12 @@ export default class GatewayController {
     try {
       const data = await restProxy.listRooms();
       const rooms = Array.isArray(data) ? data : data.rooms ?? data;
+      const wsUrl = process.env.WS_URL || "http://localhost:4000";
 
       res.json(
         rooms.map((room: any) => ({
-          room: room,
-          _links: { 
-            ...makeRoomLinks(room),
-            wsUrl: { href: process.env.WS_URL ?? "http://localhost:4000" }
-          }
+          room,
+          _links: makeRoomLinks(room, wsUrl)
         }))
       );
     } catch (err: any) {
@@ -106,13 +103,12 @@ export default class GatewayController {
       const id = req.params.id as string;
       const data = await restProxy.getRoomById(id);
       const room = data.room ?? data;
+      const wsUrl = process.env.WS_URL || "http://localhost:4000";
 
-      const links = {
-        ...makeRoomLinks(room),
-        wsUrl: { href: process.env.WS_URL ?? "http://localhost:4000" }
-      };
-
-      res.json({ room, _links: links });
+      res.json({ 
+        room, 
+        _links: makeRoomLinks(room, wsUrl) 
+      });
     } catch (err: any) {
       res.status(err.response?.status || 500).json({ error: err.message });
     }
@@ -123,13 +119,12 @@ export default class GatewayController {
       const code = req.params.code as string;
       const data = await restProxy.getRoomByCode(code);
       const room = data.room ?? data;
+      const wsUrl = process.env.WS_URL || "http://localhost:4000";
 
-      const links = {
-        ...makeRoomLinks(room),
-        wsUrl: { href: process.env.WS_URL ?? "http://localhost:4000" }
-      };
-
-      res.json({ room, _links: links });
+      res.json({ 
+        room, 
+        _links: makeRoomLinks(room, wsUrl) 
+      });
     } catch (err: any) {
       res.status(err.response?.status || 500).json({ error: err.message });
     }

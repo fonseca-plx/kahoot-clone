@@ -2,9 +2,9 @@ import { Request, Response } from "express";
 import * as roomService from "../services/roomService";
 
 const makeRoomLinks = (room: any) => ({
-  self: { href: `/api/rooms/${room.id}` },
-  join: { href: `/api/rooms/${room.code}/join`, method: "POST" },
-  info: { href: `/api/rooms/${room.id}`, method: "GET" }
+  self: { href: `/api/rooms/${room.id}`, method: "GET" },
+  byCode: { href: `/api/rooms/code/${room.code}`, method: "GET" },
+  quiz: { href: `/api/quizzes/${room.quizId}`, method: "GET" }
 });
 
 export const createRoom = async (req: Request, res: Response) => {
