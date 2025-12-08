@@ -1,19 +1,19 @@
-import { apiClient, extractData } from "./clients";
+import { apiClient } from "./clients";
 import type { User, CreateUserRequest, UserResponse } from "@/lib/types";
 
 export const usersApi = {
-  async create(data: CreateUserRequest): Promise<User> {
+  async create(data: CreateUserRequest): Promise<UserResponse> {
     const response = await apiClient.post<UserResponse>("/users", data);
-    return extractData<User>(response.data);
+    return response.data;
   },
 
-  async getById(id: string): Promise<User> {
+  async getById(id: string): Promise<UserResponse> {
     const response = await apiClient.get<UserResponse>(`/users/${id}`);
-    return extractData<User>(response.data);
+    return response.data;
   },
 
-  async list(): Promise<User[]> {
+  async list(): Promise<UserResponse[]> {
     const response = await apiClient.get<UserResponse[]>("/users");
-    return response.data.map((item) => extractData<User>(item));
+    return response.data;
   }
 };

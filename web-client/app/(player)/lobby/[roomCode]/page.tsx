@@ -18,24 +18,35 @@ export default function LobbyPage() {
   const router = useRouter();
   const roomCode = params.roomCode as string;
   
-  const { displayName } = useLocalUser();
-  const { currentRoom, loading, error, fetchRoomByCode } = useRoom();
+  const { ensureDisplayName } = useLocalUser();
+  const { currentRoom, wsUrl, loading, error, fetchRoomByCode } = useRoom();
   const { players, playerId, isHost, joinRoom, startGame } = useGame();
-  const { socket, isConnected } = useWebSocket(currentRoom?._links.websocket?.url);
+  const { socket, isConnected } = useWebSocket(wsUrl || undefined);
+
+  // Validar roomCode
+  useEffect(() => {
+    if (!roomCode || roomCode.length !== 6) {
+      router.push(ROUTES.JOIN);
+      return;
+    }
+  }, [roomCode, router]);
 
   // Buscar dados da sala
   useEffect(() => {
-    if (roomCode) {
+    if (roomCode && roomCode.length === 6) {
       fetchRoomByCode(roomCode);
     }
-  }, [roomCode]);
+  }, [roomCode, fetchRoomByCode]);
 
   // Conectar ao WebSocket e entrar na sala
   useEffect(() => {
     if (socket && isConnected && roomCode && !playerId) {
-      joinRoom(roomCode);
+      const displayName = ensureDisplayName();
+      if (displayName) {
+        joinRoom(roomCode);
+      }
     }
-  }, [socket, isConnected, roomCode, playerId, displayName]);
+  }, [socket, isConnected, roomCode, playerId, joinRoom, ensureDisplayName]);
 
   // Redirecionar quando jogo iniciar
   useEffect(() => {
@@ -57,7 +68,7 @@ export default function LobbyPage() {
   if (error || !currentRoom) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-2xl">
-        <Link href="/" className="inline-flex items-center gap-2 mb-6 text-gray-600 hover:text-[#850EF6] transition-colors">
+        <Link href={ROUTES.JOIN} className="inline-flex items-center gap-2 mb-6 text-gray-600 hover:text-[#850EF6] transition-colors">
           <ArrowLeft size={20} />
           <span className="font-semibold">Voltar</span>
         </Link>
@@ -74,7 +85,7 @@ export default function LobbyPage() {
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
-        <Link href="/" className="inline-flex items-center gap-2 text-gray-600 hover:text-[#850EF6] transition-colors">
+        <Link href={ROUTES.HOME} className="inline-flex items-center gap-2 text-gray-600 hover:text-[#850EF6] transition-colors">
           <ArrowLeft size={20} />
           <span className="font-semibold">Sair</span>
         </Link>
@@ -116,7 +127,7 @@ export default function LobbyPage() {
           <div className="md:col-span-2">
             <HostControls
               onStart={handleStart}
-              disabled={!isConnected}
+              disabled={!isConnected || players.length === 0}
               playerCount={players.length}
             />
           </div>

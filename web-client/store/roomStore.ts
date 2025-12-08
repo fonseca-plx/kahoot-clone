@@ -1,32 +1,43 @@
 import { create } from "zustand";
-import type { Room } from "@/lib/types";
+import type { Room, RoomResponse } from "@/lib/types";
 
 interface RoomState {
-  currentRoom: Room | null;
+  currentRoomResponse: RoomResponse | null;
   roomCode: string | null;
   playerId: string | null;
   isHost: boolean;
-  wsUrl: string | null;
+  joinedAt: number | null;
   
-  setRoom: (room: Room, wsUrl?: string) => void;
+  setRoom: (roomResponse: RoomResponse) => void;
+  updateRoomStatus: (status: Room['status']) => void;
   setPlayerId: (playerId: string) => void;
   setIsHost: (isHost: boolean) => void;
   clearRoom: () => void;
 }
 
-export const useRoomStore = create<RoomState>((set) => ({
-  currentRoom: null,
+export const useRoomStore = create<RoomState>((set, get) => ({
+  currentRoomResponse: null,
   roomCode: null,
   playerId: null,
   isHost: false,
-  wsUrl: null,
+  joinedAt: null,
   
-  setRoom: (room, wsUrl) => 
+  setRoom: (roomResponse) => 
     set({ 
-      currentRoom: room, 
-      roomCode: room.code,
-      wsUrl: wsUrl || null
+      currentRoomResponse: roomResponse,
+      roomCode: roomResponse.room.code,
+      joinedAt: Date.now()
     }),
+  
+  updateRoomStatus: (status) =>
+    set((state) => ({
+      currentRoomResponse: state.currentRoomResponse 
+        ? {
+            ...state.currentRoomResponse,
+            room: { ...state.currentRoomResponse.room, status }
+          }
+        : null
+    })),
   
   setPlayerId: (playerId) => set({ playerId }),
   
@@ -34,10 +45,10 @@ export const useRoomStore = create<RoomState>((set) => ({
   
   clearRoom: () => 
     set({ 
-      currentRoom: null, 
+      currentRoomResponse: null,
       roomCode: null, 
       playerId: null, 
       isHost: false,
-      wsUrl: null
+      joinedAt: null
     })
 }));

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import QuestionDisplay from "@/components/game/question-display";
 import AnswerChoices from "@/components/game/answer-choices";
 import TimerBar from "@/components/game/timer-bar";
@@ -9,9 +9,11 @@ import AnswerFeedback from "@/components/game/answer-feedback";
 import Leaderboard from "@/components/game/leaderboard";
 import LoadingScreen from "@/components/shared/loading-screen";
 import { useGame, useRoom } from "@/hooks";
+import { ROUTES } from "@/lib/utils";
 
 export default function PlayPage() {
   const params = useParams();
+  const router = useRouter();
   const roomCode = params.roomCode as string;
   
   const { currentRoom } = useRoom();
@@ -26,6 +28,13 @@ export default function PlayPage() {
     submitAnswer
   } = useGame();
 
+  // Redirecionar se jogo terminou
+  useEffect(() => {
+    if (status === "finished") {
+      router.push(ROUTES.RESULTS(roomCode));
+    }
+  }, [status, roomCode, router]);
+
   const handleAnswer = (index: number) => {
     if (currentQuestion && !hasAnswered) {
       submitAnswer(currentQuestion.questionId, index);
@@ -37,25 +46,33 @@ export default function PlayPage() {
     return <LoadingScreen message="Aguardando início do jogo..." />;
   }
 
-  // Question end state
+  // Question end state (showing results)
   if (status === "question_end" && currentQuestion) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="max-w-4xl w-full space-y-6">
-          {/* Show correct answer */}
+          {/* Show question */}
           <QuestionDisplay
             question={currentQuestion}
             questionNumber={1}
             totalQuestions={currentRoom?.quiz?.questions?.length || 1}
           />
           
+          {/* Show all choices (disabled) */}
           <AnswerChoices
             choices={currentQuestion.choices}
             onSelect={() => {}}
             selectedIndex={undefined}
-            correctIndex={currentQuestion.correctIndex}
             disabled
           />
+
+          {/* Show answer feedback */}
+          {lastAnswerCorrect !== null && (
+            <AnswerFeedback
+              correct={lastAnswerCorrect}
+              points={lastAnswerPoints}
+            />
+          )}
 
           {/* Show leaderboard */}
           {leaderboard.length > 0 && (

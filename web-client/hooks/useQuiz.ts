@@ -9,28 +9,29 @@ export function useQuiz() {
   const { loading, error, execute } = useApi();
 
   const fetchQuizzes = useCallback(async () => {
-    const result = await execute(() => api.quizzes.list());
-    if (result) {
-      setQuizzes(result);
+    const responses = await execute(() => api.quizzes.list());
+    if (responses) {
+      const quizList = responses.map(r => r.quiz);
+      setQuizzes(quizList);
     }
-    return result;
+    return responses;
   }, [execute, setQuizzes]);
 
   const fetchQuizById = useCallback(async (id: string) => {
-    const result = await execute(() => api.quizzes.getById(id));
-    if (result) {
-      setCurrentQuiz(result);
+    const response = await execute(() => api.quizzes.getById(id));
+    if (response) {
+      setCurrentQuiz(response.quiz);
     }
-    return result;
+    return response;
   }, [execute, setCurrentQuiz]);
 
   const createQuiz = useCallback(async (data: CreateQuizRequest) => {
-    const result = await execute(() => api.quizzes.create(data));
-    if (result) {
-      addQuiz(result);
-      setCurrentQuiz(result);
+    const response = await execute(() => api.quizzes.create(data));
+    if (response) {
+      addQuiz(response.quiz);
+      setCurrentQuiz(response.quiz);
     }
-    return result;
+    return response;
   }, [execute, addQuiz, setCurrentQuiz]);
 
   return {

@@ -3,16 +3,17 @@ export interface HateoasLink {
   href: string;
   method?: string;
   description?: string;
+  payload?: Record<string, any>;
 }
 
 export interface HateoasLinks {
   self?: HateoasLink;
-  [key: string]: any;
+  [key: string]: HateoasLink | WebSocketInfo | undefined;
 }
 
 export interface ApiResponse<T> {
-  [key: string]: T;
   _links: HateoasLinks;
+  [key: string]: any;
 }
 
 // ==================== USER TYPES ====================
@@ -73,7 +74,7 @@ export interface QuizResponse extends ApiResponse<Quiz> {
   quiz: Quiz;
   _links: {
     self: HateoasLink;
-    createRoom?: HateoasLink & { payload?: any };
+    createRoom?: HateoasLink;
   };
 }
 
@@ -101,10 +102,7 @@ export interface WebSocketEventInfo {
 
 export interface WebSocketInfo {
   url: string;
-  events: {
-    join?: WebSocketEventInfo;
-    start?: WebSocketEventInfo;
-  };
+  events: Record<string, WebSocketEventInfo>;
 }
 
 export interface RoomResponse extends ApiResponse<Room> {

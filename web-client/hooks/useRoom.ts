@@ -8,14 +8,17 @@ import type { CreateRoomRequest } from "@/lib/types";
 
 export function useRoom() {
   const router = useRouter();
-  const { currentRoom, roomCode, setRoom, clearRoom } = useRoomStore();
+  const { currentRoomResponse, roomCode, setRoom, clearRoom } = useRoomStore();
   const { loading, error, execute } = useApi();
+
+  // Computed values
+  const currentRoom = currentRoomResponse?.room || null;
+  const wsUrl = currentRoomResponse?._links.websocket?.url || null;
 
   const fetchRoomByCode = useCallback(async (code: string) => {
     const response = await execute(() => api.rooms.getByCode(code));
     if (response) {
-      const wsUrl = response._links.websocket?.url;
-      setRoom(response.room, wsUrl);
+      setRoom(response);
       return response;
     }
     return null;
@@ -24,8 +27,7 @@ export function useRoom() {
   const createRoom = useCallback(async (data: CreateRoomRequest) => {
     const response = await execute(() => api.rooms.create(data));
     if (response) {
-      const wsUrl = response._links.websocket?.url;
-      setRoom(response.room, wsUrl);
+      setRoom(response);
       return response;
     }
     return null;
@@ -42,6 +44,7 @@ export function useRoom() {
   return {
     currentRoom,
     roomCode,
+    wsUrl,
     loading,
     error,
     fetchRoomByCode,

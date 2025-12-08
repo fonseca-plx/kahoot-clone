@@ -1,13 +1,20 @@
 import { useLocalUserStore } from "@/store";
+import { generateRandomName } from "@/lib/utils";
 
 export function useLocalUser() {
-  const { user, setDisplayName, setUserId, ensureDisplayName } = useLocalUserStore();
+  const { displayName, setDisplayName } = useLocalUserStore();
+
+  const ensureDisplayName = () => {
+    if (displayName) return displayName;
+    const randomName = generateRandomName();
+    setDisplayName(randomName);
+    return randomName;
+  };
 
   return {
-    displayName: user?.displayName || ensureDisplayName(),
-    userId: user?.userId,
-    email: user?.email,
+    displayName: displayName || "",
+    hasDisplayName: !!displayName,
     setDisplayName,
-    setUserId
+    ensureDisplayName
   };
 }

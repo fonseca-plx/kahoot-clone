@@ -1,19 +1,19 @@
-import { apiClient, extractData } from "./clients";
+import { apiClient } from "./clients";
 import type { Quiz, CreateQuizRequest, QuizResponse } from "@/lib/types";
 
 export const quizzesApi = {
-  async create(data: CreateQuizRequest): Promise<Quiz> {
+  async create(data: CreateQuizRequest): Promise<QuizResponse> {
     const response = await apiClient.post<QuizResponse>("/quizzes", data);
-    return extractData<Quiz>(response.data);
+    return response.data;
   },
 
-  async getById(id: string): Promise<Quiz> {
+  async getById(id: string): Promise<QuizResponse> {
     const response = await apiClient.get<QuizResponse>(`/quizzes/${id}`);
-    return extractData<Quiz>(response.data);
+    return response.data;
   },
 
-  async list(): Promise<Quiz[]> {
+  async list(): Promise<QuizResponse[]> {
     const response = await apiClient.get<QuizResponse[]>("/quizzes");
-    return response.data.map((item) => extractData<Quiz>(item));
+    return response.data;
   }
 };

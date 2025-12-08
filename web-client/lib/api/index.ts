@@ -1,9 +1,8 @@
-export { apiClient, extractData } from "./clients";
-export { usersApi } from "./users";
-export { quizzesApi } from "./quizzes";
-export { roomsApi } from "./rooms";
+export { apiClient, extractData, extractDataOnly } from "./clients";
+import { usersApi } from "./users";
+import { quizzesApi } from "./quizzes";
+import { roomsApi } from "./rooms";
 
-// Export consolidado
 export const api = {
   users: usersApi,
   quizzes: quizzesApi,

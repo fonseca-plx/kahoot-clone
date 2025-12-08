@@ -4,19 +4,18 @@ import type { Quiz, CreateQuizRequest } from "@/lib/types";
 interface QuizState {
   quizzes: Quiz[];
   currentQuiz: Quiz | null;
-  isLoading: boolean;
   
   setQuizzes: (quizzes: Quiz[]) => void;
   setCurrentQuiz: (quiz: Quiz | null) => void;
   addQuiz: (quiz: Quiz) => void;
-  setLoading: (loading: boolean) => void;
+  updateQuiz: (id: string, updates: Partial<Quiz>) => void;
+  removeQuiz: (id: string) => void;
   clearQuizzes: () => void;
 }
 
 export const useQuizStore = create<QuizState>((set) => ({
   quizzes: [],
   currentQuiz: null,
-  isLoading: false,
   
   setQuizzes: (quizzes) => set({ quizzes }),
   
@@ -27,7 +26,19 @@ export const useQuizStore = create<QuizState>((set) => ({
       quizzes: [quiz, ...state.quizzes] 
     })),
   
-  setLoading: (loading) => set({ isLoading: loading }),
+  updateQuiz: (id, updates) =>
+    set((state) => ({
+      quizzes: state.quizzes.map(q => q.id === id ? { ...q, ...updates } : q),
+      currentQuiz: state.currentQuiz?.id === id 
+        ? { ...state.currentQuiz, ...updates } 
+        : state.currentQuiz
+    })),
+  
+  removeQuiz: (id) =>
+    set((state) => ({
+      quizzes: state.quizzes.filter(q => q.id !== id),
+      currentQuiz: state.currentQuiz?.id === id ? null : state.currentQuiz
+    })),
   
   clearQuizzes: () => 
     set({ 

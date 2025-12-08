@@ -14,6 +14,9 @@ interface GameState {
   setCurrentQuestion: (question: GameQuestion | null) => void;
   setQuestionStartTime: (time: number | null) => void;
   setPlayers: (players: Player[]) => void;
+  addPlayer: (player: Player) => void;
+  removePlayer: (playerId: string) => void;
+  updatePlayerScore: (playerId: string, score: number) => void;
   setLeaderboard: (leaderboard: LeaderboardEntry[]) => void;
   setStatus: (status: GameStatus) => void;
   setHasAnswered: (answered: boolean) => void;
@@ -43,6 +46,25 @@ export const useGameStore = create<GameState>((set) => ({
   setQuestionStartTime: (time) => set({ questionStartTime: time }),
   
   setPlayers: (players) => set({ players }),
+  
+  addPlayer: (player) => 
+    set((state) => {
+      const exists = state.players.find(p => p.playerId === player.playerId);
+      if (exists) return state;
+      return { players: [...state.players, player] };
+    }),
+  
+  removePlayer: (playerId) =>
+    set((state) => ({
+      players: state.players.filter(p => p.playerId !== playerId)
+    })),
+  
+  updatePlayerScore: (playerId, score) =>
+    set((state) => ({
+      players: state.players.map(p => 
+        p.playerId === playerId ? { ...p, score } : p
+      )
+    })),
   
   setLeaderboard: (leaderboard) => set({ leaderboard }),
   

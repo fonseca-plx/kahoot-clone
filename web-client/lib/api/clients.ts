@@ -26,10 +26,13 @@ apiClient.interceptors.response.use(
   }
 );
 
-// Helper para extrair dados de resposta
+// Helper para extrair dados de resposta preservando _links
 export function extractData<T>(response: any): T {
-  // A resposta pode vir como { user: {...}, _links: {...} }
-  // Precisamos extrair apenas os dados
+  return response as T;
+}
+
+// Helper para extrair apenas os dados sem _links (quando necessário)
+export function extractDataOnly<T>(response: any): T {
   const { _links, ...data } = response;
   
   // Se tiver apenas uma chave além de _links, retornar seu valor
