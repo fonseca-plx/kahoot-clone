@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -22,6 +22,9 @@ export default function LobbyPage() {
   const { currentRoom, wsUrl, loading, error, fetchRoomByCode } = useRoom();
   const { players, playerId, isHost, joinRoom, startGame } = useGame();
   const { socket, isConnected } = useWebSocket(wsUrl || undefined);
+  
+  const hasFetchedRoom = useRef(false);
+  const hasJoinedRoom = useRef(false);
 
   // Validar roomCode
   useEffect(() => {
@@ -31,22 +34,32 @@ export default function LobbyPage() {
     }
   }, [roomCode, router]);
 
-  // Buscar dados da sala
+  // Buscar dados da sala - APENAS UMA VEZ
   useEffect(() => {
-    if (roomCode && roomCode.length === 6) {
+    if (roomCode && roomCode.length === 6 && !hasFetchedRoom.current) {
+      hasFetchedRoom.current = true;
       fetchRoomByCode(roomCode);
     }
-  }, [roomCode, fetchRoomByCode]);
+  }, [roomCode]);
 
-  // Conectar ao WebSocket e entrar na sala
+  // Conectar ao WebSocket e entrar na sala - APENAS UMA VEZ
   useEffect(() => {
-    if (socket && isConnected && roomCode && !playerId) {
-      const displayName = ensureDisplayName();
-      if (displayName) {
+    if (socket && isConnected && roomCode && !playerId && !hasJoinedRoom.current) {
+      hasJoinedRoom.current = true;
+      const name = ensureDisplayName();
+      if (name) {
         joinRoom(roomCode);
       }
     }
-  }, [socket, isConnected, roomCode, playerId, joinRoom, ensureDisplayName]);
+  }, [socket, isConnected, roomCode, playerId]);
+
+  // Reset flags quando mudar de sala
+  useEffect(() => {
+    return () => {
+      hasFetchedRoom.current = false;
+      hasJoinedRoom.current = false;
+    };
+  }, [roomCode]);
 
   // Redirecionar quando jogo iniciar
   useEffect(() => {
@@ -75,7 +88,10 @@ export default function LobbyPage() {
         <ErrorMessage
           title="Sala não encontrada"
           message={error?.error || "Não foi possível entrar na sala. Verifique o código e tente novamente."}
-          onRetry={() => fetchRoomByCode(roomCode)}
+          onRetry={() => {
+            hasFetchedRoom.current = false;
+            fetchRoomByCode(roomCode);
+          }}
         />
       </div>
     );
