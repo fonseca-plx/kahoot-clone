@@ -13,6 +13,7 @@ export type RoomState = {
   quizId: string;
   questionIndex: number;
   status: "waiting" | "running" | "finished";
+  hostSocketId: string | null;
   players: Map<string, Player>;
   currentQuestion?: any;
   currentQuestionStart?: number;

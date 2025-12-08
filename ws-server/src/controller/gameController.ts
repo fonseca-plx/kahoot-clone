@@ -8,7 +8,9 @@ import {
   createRoomState,
   listPlayers,
   resetAnswers,
-  removePlayer
+  removePlayer,
+  setHost,
+  isHost
 } from "../services/roomManager";
 
 import { computePoints } from "../utils/scoring";
@@ -60,6 +62,12 @@ async function onJoinRoom(io: Server, socket: Socket, payload: any) {
     roomState = createRoomState(room.id, room.quizId, room.code);
   }
 
+  // Definir primeiro jogador como host
+  const isFirstPlayer = roomState.players.size === 0;
+  if (isFirstPlayer) {
+    setHost(roomState, socket.id);
+  }
+
   // Criar jogador
   const player: Player = {
     socketId: socket.id,
@@ -74,7 +82,8 @@ async function onJoinRoom(io: Server, socket: Socket, payload: any) {
   socket.emit("room:joined", {
     roomId: roomState.roomId,
     code: roomState.code,
-    playerId: player.playerId
+    playerId: player.playerId,
+    isHost: isHost(roomState, socket.id)
   });
 
   broadcastPlayers(io, roomState);
@@ -84,6 +93,11 @@ async function onHostStart(io: Server, socket: Socket, roomId: string) {
   const roomState = getRoomState(roomId);
   if (!roomState) {
     return socket.emit("error", { message: "room not found" });
+  }
+
+  // Verificar se é o host
+  if (!isHost(roomState, socket.id)) {
+    return socket.emit("error", { message: "only host can start game" });
   }
 
   const quiz = await getQuiz(roomState.quizId);

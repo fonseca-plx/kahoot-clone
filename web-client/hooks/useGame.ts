@@ -7,7 +7,7 @@ import { ROUTES } from "@/lib/utils";
 export function useGame() {
   const router = useRouter();
   const { socket } = useSocketStore();
-  const { roomCode, playerId, setPlayerId, isHost } = useRoomStore();
+  const { roomCode, playerId, setPlayerId, isHost, setIsHost } = useRoomStore();
   const { displayName } = useLocalUser();
   const displayNameRef = useRef(displayName);
   
@@ -38,6 +38,12 @@ export function useGame() {
 
     const handleRoomJoined = (data: any) => {
       setPlayerId(data.playerId);
+      
+      // Atualizar isHost
+      if (data.isHost !== undefined) {
+        setIsHost(data.isHost);
+      }
+      
       console.log("[Game] Joined room:", data);
     };
 

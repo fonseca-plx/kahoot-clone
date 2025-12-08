@@ -10,6 +10,7 @@ export function createRoomState(roomId: string, quizId: string, code: string): R
     code: code ?? nanoid(6).toUpperCase(),
     questionIndex: 0,
     status: "waiting",
+    hostSocketId: null,
     players: new Map(),
     questionTimer: null
   };
@@ -34,6 +35,22 @@ export function addPlayer(room: RoomState, player: Player) {
 
 export function removePlayer(room: RoomState, socketId: string) {
   room.players.delete(socketId);
+  
+  // Se o host saiu, transferir para outro jogador
+  if (room.hostSocketId === socketId && room.players.size > 0) {
+    const firstPlayer = Array.from(room.players.values())[0];
+    room.hostSocketId = firstPlayer.socketId;
+  }
+}
+
+export function isHost(room: RoomState, socketId: string): boolean {
+  return room.hostSocketId === socketId;
+}
+
+export function setHost(room: RoomState, socketId: string) {
+  if (!room.hostSocketId) {
+    room.hostSocketId = socketId;
+  }
 }
 
 export function resetAnswers(room: RoomState) {
