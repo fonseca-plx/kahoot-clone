@@ -112,7 +112,15 @@ async function onHostStart(io: Server, socket: Socket, roomId: string) {
   roomState.status = "running";
   roomState.questionIndex = 0;
 
-  startNextQuestion(io, roomState, quiz);
+  // Notificar todos que o jogo está iniciando
+  io.to(`room:${roomState.roomId}`).emit("game:starting", {
+    message: "Game is starting..."
+  });
+
+  // Pequeno delay para dar tempo de redirecionar
+  setTimeout(() => {
+    startNextQuestion(io, roomState, quiz);
+  }, 1000);
 }
 
 function startNextQuestion(io: Server, room: RoomState, quiz: any) {

@@ -63,10 +63,11 @@ export default function LobbyPage() {
 
   // Redirecionar quando jogo iniciar
   useEffect(() => {
-    if (currentRoom?.status === "running") {
+    if (status === "playing" || status === "running") {
+      console.log("[Lobby] Game started, redirecting to play page...");
       router.push(ROUTES.PLAY(roomCode));
     }
-  }, [currentRoom?.status, roomCode, router]);
+  }, [status, roomCode, router]);
 
   const handleStart = () => {
     if (currentRoom?.id) {

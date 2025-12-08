@@ -51,6 +51,11 @@ export function useGame() {
       setPlayers(data.players);
     };
 
+    const handleGameStarting = () => {
+      console.log("[Game] Game is starting...");
+      setStatus("playing");
+    };
+
     const handleQuestion = (data: any) => {
       setStatus("playing");
       setCurrentQuestion(data);
@@ -82,6 +87,7 @@ export function useGame() {
 
     socket.on("room:joined", handleRoomJoined);
     socket.on("room:player_list", handlePlayerList);
+    socket.on("game:starting", handleGameStarting);
     socket.on("game:question", handleQuestion);
     socket.on("game:answer_result", handleAnswerResult);
     socket.on("game:leaderboard", handleLeaderboard);
@@ -92,6 +98,7 @@ export function useGame() {
     return () => {
       socket.off("room:joined", handleRoomJoined);
       socket.off("room:player_list", handlePlayerList);
+      socket.off("game:starting", handleGameStarting);
       socket.off("game:question", handleQuestion);
       socket.off("game:answer_result", handleAnswerResult);
       socket.off("game:leaderboard", handleLeaderboard);
