@@ -186,15 +186,9 @@ Cria um novo quiz
   "questions": [
     {
       "text": "Quando foi a independência do Brasil?",
-      "timeLimit": 30,
-      "points": 100,
-      "order": 0,
-      "answers": [
-        { "text": "1822", "isCorrect": true },
-        { "text": "1889", "isCorrect": false },
-        { "text": "1500", "isCorrect": false },
-        { "text": "1930", "isCorrect": false }
-      ]
+      "choices": ["1822", "1889", "1500", "1930"],
+      "correctIndex": 0,
+      "timeLimitSeconds": 30
     }
   ]
 }
