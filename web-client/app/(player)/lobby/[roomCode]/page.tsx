@@ -4,7 +4,6 @@ import { useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { Button } from "@/components/ui";
 import RoomCodeDisplay from "@/components/game/room-code-display";
 import PlayerList from "@/components/game/player-list";
 import HostControls from "@/components/game/host-controls";
@@ -20,7 +19,7 @@ export default function LobbyPage() {
   
   const { ensureDisplayName } = useLocalUser();
   const { currentRoom, wsUrl, loading, error, fetchRoomByCode } = useRoom();
-  const { players, playerId, isHost, joinRoom, startGame } = useGame();
+  const { players, playerId, isHost, status, joinRoom, startGame } = useGame();
   const { socket, isConnected } = useWebSocket(wsUrl || undefined);
   
   const hasFetchedRoom = useRef(false);
@@ -63,7 +62,7 @@ export default function LobbyPage() {
 
   // Redirecionar quando jogo iniciar
   useEffect(() => {
-    if (status === "playing" || status === "running") {
+    if (status === "playing") {
       console.log("[Lobby] Game started, redirecting to play page...");
       router.push(ROUTES.PLAY(roomCode));
     }

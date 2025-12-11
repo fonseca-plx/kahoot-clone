@@ -11,14 +11,6 @@ export function useWebSocket(url?: string, autoConnect = true) {
       connect(url);
       hasConnectedRef.current = true;
     }
-
-    return () => {
-      // Só desconectar no unmount se autoConnect estiver ativo
-      if (autoConnect) {
-        disconnect();
-        hasConnectedRef.current = false;
-      }
-    };
   }, [url, autoConnect]);
 
   return {
