@@ -111,6 +111,7 @@ async function onHostStart(io: Server, socket: Socket, roomId: string) {
 
   roomState.status = "running";
   roomState.questionIndex = 0;
+  roomState.quiz = quiz;
 
   // Notificar todos que o jogo está iniciando
   io.to(`room:${roomState.roomId}`).emit("game:starting", {
@@ -119,12 +120,14 @@ async function onHostStart(io: Server, socket: Socket, roomId: string) {
 
   // Pequeno delay para dar tempo de redirecionar
   setTimeout(() => {
-    startNextQuestion(io, roomState, quiz);
+    startNextQuestion(io, roomState);
   }, 1000);
 }
 
-function startNextQuestion(io: Server, room: RoomState, quiz: any) {
-  if (room.questionIndex >= quiz.questions.length) {
+function startNextQuestion(io: Server, room: RoomState) {
+  const quiz = room.quiz;
+  
+  if (!quiz || room.questionIndex >= quiz.questions.length) {
     finishGame(io, room);
     return;
   }
@@ -147,13 +150,13 @@ function startNextQuestion(io: Server, room: RoomState, quiz: any) {
   });
 
   room.questionTimer = setTimeout(() => {
-    endQuestion(io, room, quiz);
+    endQuestion(io, room);
   }, q.timeLimitSeconds * 1000);
 
   room.questionIndex++;
 }
 
-function endQuestion(io: Server, room: RoomState, quiz: any) {
+function endQuestion(io: Server, room: RoomState) {
   if (room.questionTimer) {
     clearTimeout(room.questionTimer);
     room.questionTimer = null;
@@ -165,7 +168,7 @@ function endQuestion(io: Server, room: RoomState, quiz: any) {
   });
 
   // Pequeno delay antes da próxima pergunta para mostrar resultado
-  setTimeout(() => startNextQuestion(io, room, quiz), 3000);
+  setTimeout(() => startNextQuestion(io, room), 5000);
 }
 
 function onPlayerAnswer(io: Server, socket: Socket, payload: any) {
@@ -203,12 +206,9 @@ function onPlayerAnswer(io: Server, socket: Socket, payload: any) {
     clearTimeout(room.questionTimer);
     room.questionTimer = null;
     
-    // Pequeno delay para todos verem seus resultados
+    // Pequeno delay para todos verem seus resultados, depois chamar endQuestion
     setTimeout(() => {
-      io.to(`room:${room.roomId}`).emit("game:question_end", {
-        questionId: question.id,
-        correctIndex: question.correctIndex
-      });
+      endQuestion(io, room);
     }, 1000);
   }
 }
