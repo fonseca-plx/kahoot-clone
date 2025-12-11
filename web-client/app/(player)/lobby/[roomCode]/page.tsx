@@ -41,19 +41,23 @@ export default function LobbyPage() {
     }
   }, [roomCode]);
 
-  // Conectar ao WebSocket e entrar na sala - APENAS UMA VEZ
+  // Conectar ao WebSocket e entrar na sala - APENAS UMA VEZ POR ROOM CODE
   useEffect(() => {
-    if (socket && isConnected && roomCode && !playerId && !hasJoinedRoom.current) {
+    if (socket && isConnected && roomCode && !hasJoinedRoom.current) {
       hasJoinedRoom.current = true;
       const name = ensureDisplayName();
       if (name) {
         joinRoom(roomCode);
       }
     }
-  }, [socket, isConnected, roomCode, playerId]);
+  }, [socket, isConnected, roomCode, joinRoom, ensureDisplayName]);
 
   // Reset flags quando mudar de sala
   useEffect(() => {
+    // Resetar flags quando o roomCode mudar
+    hasFetchedRoom.current = false;
+    hasJoinedRoom.current = false;
+    
     return () => {
       hasFetchedRoom.current = false;
       hasJoinedRoom.current = false;
