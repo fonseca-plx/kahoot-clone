@@ -7,7 +7,8 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "ts-node tests/testRoomFlow.ts"
+    "test": "ts-node tests/testRoomFlow.ts",
+    "test:rabbitmq": "ts-node tests/testRabbitMQ.ts"
   },
   "keywords": [],
   "author": "",
