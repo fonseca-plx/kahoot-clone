@@ -1,7 +1,9 @@
 import axios, { AxiosError } from "axios";
 import type { ApiError } from "@/lib/types";
 
-const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:3000/api";
+const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || 
+                    process.env.NEXT_PUBLIC_API_URL || 
+                    "http://localhost:3000/api";
 
 // Criar instância do Axios
 export const apiClient = axios.create({

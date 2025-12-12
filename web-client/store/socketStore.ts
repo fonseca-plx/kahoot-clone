@@ -19,6 +19,8 @@ export const useSocketStore = create<SocketState>((set, get) => ({
   connectionError: null,
   
   connect: (url) => {
+    console.log("[SocketStore] Attempting to connect to:", url);
+    
     const currentSocket = get().socket;
     
     // Se já existe socket conectado, não criar novo

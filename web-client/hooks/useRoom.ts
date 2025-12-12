@@ -14,6 +14,12 @@ export function useRoom() {
   // Computed values
   const currentRoom = currentRoomResponse?.room || null;
   const wsUrl = currentRoomResponse?._links.websocket?.url || null;
+  
+  // Debug log
+  if (currentRoomResponse) {
+    console.log("[useRoom] Room response:", currentRoomResponse);
+    console.log("[useRoom] WebSocket URL:", wsUrl);
+  }
 
   const fetchRoomByCode = useCallback(async (code: string) => {
     const response = await execute(() => api.rooms.getByCode(code));

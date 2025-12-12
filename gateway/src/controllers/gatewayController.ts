@@ -87,7 +87,7 @@ export default class GatewayController {
     try {
       const data = await restProxy.createRoom(req.body);
       const room = data.room?.room ?? data.room ?? data;
-      const wsUrl = process.env.WS_URL || "http://localhost:4000";
+      const wsUrl = process.env.PUBLIC_WS_URL || "ws://localhost:4000";
 
       res.status(201).json({ 
         room, 
@@ -111,7 +111,7 @@ export default class GatewayController {
         rooms = roomsList.map((item: any) => item.room?.room ?? item.room ?? item);
       }
 
-      const wsUrl = process.env.WS_URL || "http://localhost:4000";
+      const wsUrl = process.env.PUBLIC_WS_URL || "ws://localhost:4000";
 
       res.json(
         rooms.map((room: any) => ({
@@ -129,7 +129,7 @@ export default class GatewayController {
       const id = req.params.id as string;
       const data = await restProxy.getRoomById(id);
       const room = data.room?.room ?? data.room ?? data;
-      const wsUrl = process.env.WS_URL || "http://localhost:4000";
+      const wsUrl = process.env.PUBLIC_WS_URL || "ws://localhost:4000";
 
       res.json({ 
         room, 
@@ -145,7 +145,7 @@ export default class GatewayController {
       const code = req.params.code as string;
       const data = await restProxy.getRoomByCode(code);
       const room = data.room?.room ?? data.room ?? data;
-      const wsUrl = process.env.WS_URL || "http://localhost:4000";
+      const wsUrl = process.env.PUBLIC_WS_URL || "ws://localhost:4000";
 
       res.json({ 
         room, 
