@@ -19,4 +19,5 @@ export type RoomState = {
   currentQuestion?: any;
   currentQuestionStart?: number;
   questionTimer?: NodeJS.Timeout | null;
+  rabbitMQQueue?: string;
 };

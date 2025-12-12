@@ -20,6 +20,29 @@ services:
       timeout: 5s
       retries: 5
 
+  # ==================== MESSAGE BROKER ====================
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: kahoot-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"   # AMQP protocol port
+      - "15672:15672" # Management UI port
+    environment:
+      RABBITMQ_DEFAULT_USER: kahoot
+      RABBITMQ_DEFAULT_PASS: kahoot123
+      RABBITMQ_DEFAULT_VHOST: /
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - kahoot-network
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   # ==================== REST API ====================
   rest-api:
     build:
@@ -55,9 +78,13 @@ services:
     environment:
       PORT: 4000
       REST_API_URL: http://rest-api:3001/api
+      RABBITMQ_URL: amqp://kahoot:kahoot123@rabbitmq:5672
       NODE_ENV: development
     depends_on:
-      - rest-api
+      rest-api:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
     networks:
       - kahoot-network
     volumes:
@@ -117,3 +144,4 @@ networks:
 
 volumes:
   postgres_data:
+  rabbitmq_data:

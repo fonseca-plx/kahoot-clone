@@ -15,8 +15,9 @@ import {
 
 import { computePoints } from "../utils/scoring";
 import { RoomState, Player } from "../types";
+import { RabbitMQService } from "../messaging/rabbitmq";
 
-export function registerGameEvents(io: Server) {
+export function registerGameEvents(io: Server, mq: RabbitMQService) {
   io.on("connection", (socket: Socket) => {
     console.log("[WS] connected:", socket.id);
 
