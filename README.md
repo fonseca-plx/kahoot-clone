@@ -16,7 +16,7 @@ Este projeto implementa uma aplicação de quiz em tempo real inspirada no Kahoo
 
 ## 🏗️ Arquitetura
 
-O projeto segue uma arquitetura de microsserviços distribuídos com os seguintes componentes:
+O projeto segue uma arquitetura de microsserviços distribuídos com mensageria assíncrona:
 
 ```
 ┌─────────────┐
@@ -28,14 +28,15 @@ O projeto segue uma arquitetura de microsserviços distribuídos com os seguinte
 ┌──────▼──────┐   ┌─────▼──────┐   ┌─────▼──────┐
 │ API Gateway │   │  REST API  │   │ WS Server  │
 │   (3000)    │   │   (3001)   │   │   (4000)   │
-└──────┬──────┘   └─────┬──────┘   └────────────┘
-       │                │
-       └────────────────┤
-                        │
-                   ┌────▼────┐
-                   │PostgreSQL│
-                   │  (5431) │
-                   └─────────┘
+└──────┬──────┘   └─────┬──────┘   └─────┬──────┘
+       │                │                 │
+       └────────────────┤                 │
+                        │                 │
+                   ┌────▼────┐      ┌─────▼──────┐
+                   │PostgreSQL│      │ RabbitMQ   │
+                   │  (5432) │      │  (5672)    │
+                   └─────────┘      └────────────┘
+                                    Message Broker
 ```
 
 ### Componentes
@@ -44,7 +45,8 @@ O projeto segue uma arquitetura de microsserviços distribuídos com os seguinte
 2. **API Gateway** - Ponto de entrada unificado que roteia requisições ([documentação](./gateway/README.md))
 3. **REST API** - Serviço de gerenciamento de dados (usuários, quizzes, salas) ([documentação](./rest-api/README.md))
 4. **WebSocket Server** - Servidor de comunicação em tempo real para gameplay ([documentação](./ws-server/README.md))
-5. **PostgreSQL** - Banco de dados relacional para persistência
+5. **RabbitMQ** - Message Broker (MOM) para comunicação assíncrona entre serviços
+6. **PostgreSQL** - Banco de dados relacional para persistência
 
 ## 🛠️ Tecnologias Utilizadas
 
@@ -53,6 +55,8 @@ O projeto segue uma arquitetura de microsserviços distribuídos com os seguinte
 - **TypeScript** - Superset tipado do JavaScript
 - **Express** - Framework web minimalista
 - **Socket.IO** - Biblioteca para comunicação WebSocket em tempo real
+- **RabbitMQ** - Message Broker para mensageria assíncrona (AMQP)
+- **amqplib** - Cliente Node.js para RabbitMQ
 - **Prisma** - ORM moderno para Node.js e TypeScript
 - **PostgreSQL** - Banco de dados relacional
 - **Swagger** - Documentação interativa de APIs
@@ -72,98 +76,109 @@ O projeto segue uma arquitetura de microsserviços distribuídos com os seguinte
 
 ## 🚀 Como Executar o Projeto
 
-### Pré-requisitos
+### 🐳 Execução com Docker (Recomendado)
 
-- Node.js 18+ instalado
-- Docker e Docker Compose instalados
-- npm ou yarn
-
-### Passo 1: Clonar o Repositório
+A forma mais rápida e confiável de executar o projeto é usando Docker Compose:
 
 ```bash
+# 1. Clonar o repositório
 git clone https://github.com/fonseca-plx/kahoot-clone.git
 cd kahoot-clone
+
+# 2. Iniciar todos os serviços
+docker-compose up --build
+
+# Ou em background
+docker-compose up -d --build
 ```
 
-### Passo 2: Iniciar o Banco de Dados
+**Serviços disponíveis:**
+- Web Client: http://localhost:3002
+- API Gateway: http://localhost:3000
+- REST API: http://localhost:3001
+- WebSocket Server: http://localhost:4000
+- RabbitMQ Management: http://localhost:15672 (user: `kahoot`, pass: `kahoot123`)
+- PostgreSQL: localhost:5432
+
+**📖 Documentação completa do Docker:** [DOCKER_SETUP.md](./DOCKER_SETUP.md)
+
+---
+
+### ⚙️ Execução Manual (Desenvolvimento)
+
+<details>
+<summary>Clique para ver instruções de execução manual</summary>
+
+#### Pré-requisitos
+- Node.js 18+
+- Docker (apenas para PostgreSQL e RabbitMQ)
+- npm ou yarn
+
+#### 1. Iniciar infraestrutura
 
 ```bash
-docker-compose up -d
+docker-compose up -d postgres rabbitmq
 ```
 
-Isso iniciará o PostgreSQL na porta `5431`.
-
-### Passo 3: Configurar e Iniciar a REST API
+#### 2. REST API
 
 ```bash
 cd rest-api
 npm install
-
-# Configurar variáveis de ambiente
-echo "DATABASE_URL=postgresql://dev:dev@localhost:5431/kahoot_dev" > .env
+echo "DATABASE_URL=postgresql://dev:dev@localhost:5432/kahoot_dev" > .env
 echo "PORT=3001" >> .env
-
-# Executar migrations do banco de dados
-npm run prisma:migrate
-
-# Iniciar o servidor
+npx prisma generate
+npx prisma migrate deploy
 npm run dev
 ```
 
-A REST API estará disponível em `http://localhost:3001`
-- Documentação Swagger: `http://localhost:3001/docs`
-
-### Passo 4: Configurar e Iniciar o WebSocket Server
+#### 3. WebSocket Server
 
 ```bash
 cd ws-server
 npm install
-
-# Configurar variáveis de ambiente
 echo "PORT=4000" > .env
 echo "REST_API_URL=http://localhost:3001/api" >> .env
-
-# Iniciar o servidor
+echo "RABBITMQ_URL=amqp://kahoot:kahoot123@localhost:5672" >> .env
 npm run dev
 ```
 
-O WebSocket Server estará disponível em `http://localhost:4000`
-
-### Passo 5: Configurar e Iniciar o API Gateway
+#### 4. API Gateway
 
 ```bash
 cd gateway
 npm install
-
-# Configurar variáveis de ambiente
 echo "PORT=3000" > .env
 echo "REST_API_URL=http://localhost:3001/api" >> .env
-echo "WS_SERVER_URL=http://localhost:4000" >> .env
-
-# Iniciar o servidor
 npm run dev
 ```
 
-O API Gateway estará disponível em `http://localhost:3000`
-- Documentação Swagger: `http://localhost:3000/docs`
-
-### Passo 6: Configurar e Iniciar o Web Client
+#### 5. Web Client
 
 ```bash
 cd web-client
 npm install
-
-# Configurar variáveis de ambiente
-echo "NEXT_PUBLIC_API_URL=http://localhost:3000/api" > .env.local
-echo "NEXT_PUBLIC_WS_URL=http://localhost:4000" >> .env.local
-
-# Iniciar o servidor de desenvolvimento
+echo "NEXT_PUBLIC_API_URL=http://localhost:3000" > .env.local
 npm run dev
 ```
 
-O cliente web estará disponível em `http://localhost:3001` (ou a porta indicada pelo Next.js)
+</details>
 
 ## 🧪 Como Testar
+
+### Teste de Conexão RabbitMQ
+
+Verifique se o message broker está funcionando:
+
+```bash
+cd ws-server
+npm run test:rabbitmq
+```
+
+**RabbitMQ Management UI**: http://localhost:15672
+- User: `kahoot`
+- Pass: `kahoot123`
+- Verifique exchanges: `kahoot.room.events` e `kahoot.game.events`
 
 ### Teste Manual Completo
 
@@ -227,8 +242,25 @@ curl http://localhost:4000/health
 curl http://localhost:3000/health
 ```
 
+## ⚡ Escalabilidade Horizontal
+
+Com RabbitMQ como Message Broker, o sistema suporta múltiplas instâncias do WebSocket Server:
+
+```bash
+# Adicionar segunda instância ao docker-compose.yml
+# e executar:
+docker-compose up --scale ws-server=3
+```
+
+**Benefícios:**
+- ✅ Load balancing automático
+- ✅ Alta disponibilidade
+- ✅ Eventos compartilhados entre instâncias
+- ✅ Suporte a milhares de jogadores simultâneos
+
 ## 📚 Documentação Detalhada
 
+- **[Configuração Docker](./DOCKER_SETUP.md)** - Guia completo de Docker e Docker Compose
 - **[API Gateway](./gateway/README.md)** - Documentação do gateway de APIs
 - **[REST API](./rest-api/README.md)** - Documentação da API REST
 - **[WebSocket Server](./ws-server/README.md)** - Documentação do servidor WebSocket
