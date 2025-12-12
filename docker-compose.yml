@@ -1,6 +1,8 @@
 services:
-  db-rest:
+  # ==================== DATABASE ====================
+  postgres:
     image: postgres:15-alpine
+    container_name: kahoot-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: dev
@@ -9,7 +11,137 @@ services:
     ports:
       - "5431:5432"
     volumes:
-      - db_rest_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - kahoot-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev -d kahoot_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==================== MESSAGE BROKER ====================
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: kahoot-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"   # AMQP protocol port
+      - "15672:15672" # Management UI port
+    environment:
+      RABBITMQ_DEFAULT_USER: kahoot
+      RABBITMQ_DEFAULT_PASS: kahoot123
+      RABBITMQ_DEFAULT_VHOST: /
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - kahoot-network
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ==================== REST API ====================
+  rest-api:
+    build:
+      context: ./rest-api
+      dockerfile: Dockerfile
+    container_name: kahoot-rest-api
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgresql://dev:dev@postgres:5432/kahoot_dev
+      NODE_ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - kahoot-network
+    volumes:
+      - ./rest-api:/app
+      - /app/node_modules
+    command: sh -c "npx prisma generate && npx prisma migrate deploy && npm run dev"
+
+  # ==================== WEBSOCKET SERVER ====================
+  ws-server:
+    build:
+      context: ./ws-server
+      dockerfile: Dockerfile
+    container_name: kahoot-ws-server
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      PORT: 4000
+      REST_API_URL: http://rest-api:3001/api
+      RABBITMQ_URL: amqp://kahoot:kahoot123@rabbitmq:5672
+      NODE_ENV: development
+    depends_on:
+      rest-api:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - kahoot-network
+    volumes:
+      - ./ws-server:/app
+      - /app/node_modules
+    command: npm run dev
+
+  # ==================== GATEWAY ====================
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    container_name: kahoot-gateway
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      REST_API_URL: http://rest-api:3001/api
+      WS_SERVER_URL: http://ws-server:4000
+      NODE_ENV: development
+    depends_on:
+      - rest-api
+      - ws-server
+    networks:
+      - kahoot-network
+    volumes:
+      - ./gateway:/app
+      - /app/node_modules
+    command: npm run dev
+
+  # ==================== WEB CLIENT ====================
+  web-client:
+    build:
+      context: ./web-client
+      dockerfile: Dockerfile
+    container_name: kahoot-web-client
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3000
+      NODE_ENV: development
+    depends_on:
+      - gateway
+    networks:
+      - kahoot-network
+    volumes:
+      - ./web-client:/app
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev
+
+networks:
+  kahoot-network:
+    driver: bridge
 
 volumes:
-  db_rest_data:
+  postgres_data:
+  rabbitmq_data:
