@@ -54,7 +54,7 @@ services:
       - "4000:4000"
     environment:
       PORT: 4000
-      REST_API_URL: http://rest-api:3001
+      REST_API_URL: http://rest-api:3001/api
       NODE_ENV: development
     depends_on:
       - rest-api
@@ -76,7 +76,7 @@ services:
       - "3000:3000"
     environment:
       PORT: 3000
-      REST_API_URL: http://rest-api:3001
+      REST_API_URL: http://rest-api:3001/api
       WS_SERVER_URL: http://ws-server:4000
       NODE_ENV: development
     depends_on:
