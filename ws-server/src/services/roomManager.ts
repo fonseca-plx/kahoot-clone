@@ -33,14 +33,19 @@ export function addPlayer(room: RoomState, player: Player) {
   room.players.set(player.socketId, player);
 }
 
-export function removePlayer(room: RoomState, socketId: string) {
+export function removePlayer(room: RoomState, socketId: string): string | null {
   room.players.delete(socketId);
   
   // Se o host saiu, transferir para outro jogador
   if (room.hostSocketId === socketId && room.players.size > 0) {
     const firstPlayer = Array.from(room.players.values())[0];
-    room.hostSocketId = firstPlayer.socketId;
+    if (firstPlayer) {
+      room.hostSocketId = firstPlayer.socketId;
+      return firstPlayer.socketId;
+    }
   }
+  
+  return null;
 }
 
 export function isHost(room: RoomState, socketId: string): boolean {

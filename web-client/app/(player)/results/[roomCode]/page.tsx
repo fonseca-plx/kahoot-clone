@@ -1,11 +1,12 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Home, RotateCcw } from "lucide-react";
 import { Button, Card } from "@/components/ui";
 import Leaderboard from "@/components/game/leaderboard";
 import LoadingScreen from "@/components/shared/loading-screen";
-import { useGame, useRoom } from "@/hooks";
+import { useGame, useRoom, useWebSocket } from "@/hooks";
 import { ROUTES } from "@/lib/utils";
 
 export default function ResultsPage() {
@@ -13,6 +14,13 @@ export default function ResultsPage() {
   
   const { leaderboard, playerId, resetGame } = useGame();
   const { currentRoom, clearRoom } = useRoom();
+  const { disconnect } = useWebSocket();
+
+  useEffect(() => {
+    return () => {
+      disconnect();
+    };
+  }, [disconnect]);
 
   if (leaderboard.length === 0) {
     return <LoadingScreen message="Carregando resultados..." />;

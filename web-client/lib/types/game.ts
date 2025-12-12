@@ -38,6 +38,7 @@ export interface LeaderboardEntry {
 export interface ServerToClientEvents {
   "room:joined": (data: { roomId: string; code: string; playerId: string; isHost?: boolean }) => void;
   "room:player_list": (data: { players: Player[] }) => void;
+  "room:host_changed": (data: { newHostPlayerId: string; newHostDisplayName: string; isHost: boolean }) => void;
   "game:starting": (data: { message: string }) => void;
   "game:question": (data: GameQuestion) => void;
   "game:answer_result": (data: AnswerResult) => void;

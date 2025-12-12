@@ -20,12 +20,11 @@ export default function LobbyPage() {
   const { ensureDisplayName } = useLocalUser();
   const { currentRoom, wsUrl, loading, error, fetchRoomByCode } = useRoom();
   const { players, playerId, isHost, status, joinRoom, startGame } = useGame();
-  const { socket, isConnected } = useWebSocket(wsUrl || undefined);
+  const { socket, isConnected, disconnect } = useWebSocket(wsUrl || undefined);
   
   const hasFetchedRoom = useRef(false);
   const hasJoinedRoom = useRef(false);
 
-  // Validar roomCode
   useEffect(() => {
     if (!roomCode || roomCode.length !== 6) {
       router.push(ROUTES.JOIN);
@@ -33,15 +32,13 @@ export default function LobbyPage() {
     }
   }, [roomCode, router]);
 
-  // Buscar dados da sala - APENAS UMA VEZ
   useEffect(() => {
     if (roomCode && roomCode.length === 6 && !hasFetchedRoom.current) {
       hasFetchedRoom.current = true;
       fetchRoomByCode(roomCode);
     }
-  }, [roomCode]);
+  }, [roomCode, fetchRoomByCode]);
 
-  // Conectar ao WebSocket e entrar na sala - APENAS UMA VEZ POR ROOM CODE
   useEffect(() => {
     if (socket && isConnected && roomCode && !hasJoinedRoom.current) {
       hasJoinedRoom.current = true;
@@ -52,9 +49,7 @@ export default function LobbyPage() {
     }
   }, [socket, isConnected, roomCode, joinRoom, ensureDisplayName]);
 
-  // Reset flags quando mudar de sala
   useEffect(() => {
-    // Resetar flags quando o roomCode mudar
     hasFetchedRoom.current = false;
     hasJoinedRoom.current = false;
     
@@ -64,10 +59,8 @@ export default function LobbyPage() {
     };
   }, [roomCode]);
 
-  // Redirecionar quando jogo iniciar
   useEffect(() => {
     if (status === "playing") {
-      console.log("[Lobby] Game started, redirecting to play page...");
       router.push(ROUTES.PLAY(roomCode));
     }
   }, [status, roomCode, router]);
@@ -76,6 +69,11 @@ export default function LobbyPage() {
     if (currentRoom?.id) {
       startGame(currentRoom.id);
     }
+  };
+
+  const handleLeave = () => {
+    disconnect();
+    router.push(ROUTES.HOME);
   };
 
   if (loading) {
@@ -103,12 +101,14 @@ export default function LobbyPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
-      {/* Header */}
       <div className="flex items-center justify-between mb-8">
-        <Link href={ROUTES.HOME} className="inline-flex items-center gap-2 text-gray-600 hover:text-[#850EF6] transition-colors">
+        <button 
+          onClick={handleLeave}
+          className="inline-flex items-center gap-2 text-gray-600 hover:text-[#850EF6] transition-colors"
+        >
           <ArrowLeft size={20} />
           <span className="font-semibold">Sair</span>
-        </Link>
+        </button>
         
         <div className="text-center">
           <h1 className="text-2xl font-bold">Sala de Espera</h1>
@@ -120,7 +120,6 @@ export default function LobbyPage() {
         <div className="w-20"></div>
       </div>
 
-      {/* Connection Status */}
       {!isConnected && (
         <div className="mb-6">
           <ErrorMessage
@@ -130,19 +129,15 @@ export default function LobbyPage() {
         </div>
       )}
 
-      {/* Content */}
       <div className="grid md:grid-cols-2 gap-6">
-        {/* Room Code */}
         <div className="md:col-span-2">
           <RoomCodeDisplay code={currentRoom.code} />
         </div>
 
-        {/* Player List */}
         <div className="md:col-span-2">
           <PlayerList players={players} currentPlayerId={playerId || undefined} />
         </div>
 
-        {/* Host Controls */}
         {isHost && (
           <div className="md:col-span-2">
             <HostControls
@@ -154,7 +149,6 @@ export default function LobbyPage() {
         )}
       </div>
 
-      {/* Waiting Message */}
       {!isHost && (
         <div className="mt-6 text-center">
           <p className="text-lg text-gray-600 font-semibold">

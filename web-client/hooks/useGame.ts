@@ -81,12 +81,20 @@ export function useGame() {
       }
     };
 
+    const handleHostChanged = (data: any) => {
+      setIsHost(data.isHost);
+      if (data.isHost) {
+        console.log("[Game] You are now the host!");
+      }
+    };
+
     const handleError = (data: any) => {
       console.error("[Game] Error:", data.message);
     };
 
     socket.on("room:joined", handleRoomJoined);
     socket.on("room:player_list", handlePlayerList);
+    socket.on("room:host_changed", handleHostChanged);
     socket.on("game:starting", handleGameStarting);
     socket.on("game:question", handleQuestion);
     socket.on("game:answer_result", handleAnswerResult);
@@ -98,6 +106,7 @@ export function useGame() {
     return () => {
       socket.off("room:joined", handleRoomJoined);
       socket.off("room:player_list", handlePlayerList);
+      socket.off("room:host_changed", handleHostChanged);
       socket.off("game:starting", handleGameStarting);
       socket.off("game:question", handleQuestion);
       socket.off("game:answer_result", handleAnswerResult);

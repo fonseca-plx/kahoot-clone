@@ -223,6 +223,21 @@ function broadcastPlayers(io: Server, room: RoomState) {
   io.to(`room:${room.roomId}`).emit("room:player_list", { players });
 }
 
+function broadcastHostChange(io: Server, room: RoomState, newHostSocketId: string) {
+  const newHost = room.players.get(newHostSocketId);
+  if (!newHost) return;
+  
+  console.log(`[WS] Host transferred to ${newHost.displayName} in room ${room.roomId}`);
+  
+  for (const [socketId] of room.players) {
+    io.to(socketId).emit("room:host_changed", {
+      newHostPlayerId: newHost.playerId,
+      newHostDisplayName: newHost.displayName,
+      isHost: socketId === newHostSocketId
+    });
+  }
+}
+
 function broadcastLeaderboard(io: Server, room: RoomState) {
   const leaderboard = listPlayers(room)
     .map(p => ({ playerId: p.playerId, displayName: p.displayName, score: p.score }))
@@ -249,20 +264,20 @@ function finishGame(io: Server, room: RoomState) {
 function onDisconnect(io: Server, socket: Socket) {
   console.log("[WS] disconnected:", socket.id);
   
-  // Importa o map de rooms diretamente
   const roomManager = require("../services/roomManager");
   
-  // Procura o jogador em todas as salas
   for (const room of roomManager.getAllRooms()) {
     if (room.players.has(socket.id)) {
-      removePlayer(room, socket.id);
+      const newHostSocketId = removePlayer(room, socket.id);
       console.log(`[WS] Player removed from room ${room.roomId}`);
       
-      // Notifica outros jogadores
+      if (newHostSocketId) {
+        broadcastHostChange(io, room, newHostSocketId);
+      }
+      
       broadcastPlayers(io, room);
       
-      // Se a sala ficou vazia e não está em jogo, pode limpar
-      if (room.players.size === 0 && room.status === "waiting") {
+      if (room.players.size === 0) {
         roomManager.deleteRoom(room.roomId);
         console.log(`[WS] Empty room ${room.roomId} deleted`);
       }
