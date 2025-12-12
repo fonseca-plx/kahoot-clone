@@ -16,7 +16,12 @@ app.get("/health", (req, res) => {
 const httpServer = http.createServer(app);
 
 const io = new Server(httpServer, {
-  cors: { origin: "*" }
+  cors: {
+    origin: process.env.NODE_ENV === 'production'
+      ? ['http://yourdomain.com']
+      : '*',
+    credentials: true
+  }
 });
 
 registerGameEvents(io);

@@ -8,7 +8,12 @@ import swaggerJsdoc from "swagger-jsdoc";
 import { swaggerOptions } from "./docs/swaggerOptions";
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production'
+    ? ['http://yourdomain.com']
+    : '*',
+  credentials: true
+}));
 app.use(express.json({ limit: "5mb" }));
 
 app.use("/api/users", userRoutes);
