@@ -1,6 +1,14 @@
-import { Server, Socket } from "socket.io";
 import { nanoid } from "nanoid";
 import { RabbitMQService } from "../messaging/rabbitmq";
+import { GameWebSocketServer } from "../websocket/server";
+import {
+  MessageType,
+  JoinRoomPayload,
+  StartGamePayload,
+  AnswerQuestionPayload,
+  createMessage,
+  createErrorMessage,
+} from "../websocket/protocol";
 
 import { getRoom, getQuiz } from "../utils/restClient";
 import {
@@ -17,38 +25,53 @@ import {
 import { computePoints } from "../utils/scoring";
 import { RoomState, Player } from "../types";
 
-export function registerGameEvents(io: Server, mq: RabbitMQService) {
-  io.on("connection", (socket: Socket) => {
-    console.log("[WS] connected:", socket.id);
+export function registerGameEvents(wsServer: GameWebSocketServer, mq: RabbitMQService) {
+  // Registrar handler de mensagens
+  wsServer.setMessageHandler(async (clientId, message) => {
+    console.log(`[GameController] Message from ${clientId}: ${message.type}`);
 
-    socket.on("room:join", async ({ code, roomId, displayName }) =>
-      onJoinRoom(io, socket, mq, { code, roomId, displayName })
-    );
+    switch (message.type) {
+      case MessageType.JOIN_ROOM:
+        await onJoinRoom(wsServer, mq, clientId, message.data as JoinRoomPayload);
+        break;
 
-    socket.on("host:start", async ({ roomId }) =>
-      onHostStart(io, socket, mq, roomId)
-    );
+      case MessageType.START_GAME:
+        await onHostStart(wsServer, mq, clientId, message.data as StartGamePayload);
+        break;
 
-    socket.on("game:answer", payload =>
-      onPlayerAnswer(io, socket, mq, payload)
-    );
+      case MessageType.ANSWER_QUESTION:
+        await onPlayerAnswer(wsServer, mq, clientId, message.data as AnswerQuestionPayload);
+        break;
 
-    socket.on("disconnect", () => {
-      onDisconnect(io, socket, mq);
-    });
+      default:
+        console.warn(`[GameController] Unknown message type: ${message.type}`);
+        wsServer.sendToClient(clientId, createErrorMessage('Unknown message type'));
+    }
   });
+
+  // Registrar handler de desconexão
+  wsServer.setDisconnectHandler(async (clientId) => {
+    await onDisconnect(wsServer, mq, clientId);
+  });
+
+  console.log('[GameController] Game events registered');
 }
 
-async function onJoinRoom(io: Server, socket: Socket, mq: RabbitMQService, payload: any) {
+async function onJoinRoom(
+  wsServer: GameWebSocketServer, 
+  mq: RabbitMQService, 
+  clientId: string, 
+  payload: JoinRoomPayload
+) {
   const idOrCode = payload.roomId ?? payload.code;
   const displayName = payload.displayName;
   
   if (!idOrCode) {
-    return socket.emit("error", { message: "roomId or code required" });
+    return wsServer.sendToClient(clientId, createErrorMessage("roomId or code required"));
   }
   
   if (!displayName) {
-    return socket.emit("error", { message: "displayName required" });
+    return wsServer.sendToClient(clientId, createErrorMessage("displayName required"));
   }
 
   let roomState = getRoomState(idOrCode);
@@ -56,7 +79,7 @@ async function onJoinRoom(io: Server, socket: Socket, mq: RabbitMQService, paylo
   if (!roomState) {
     const room = await getRoom(idOrCode);
     if (!room) {
-      return socket.emit("error", { message: "Room not found" });
+      return wsServer.sendToClient(clientId, createErrorMessage("Room not found"));
     }
 
     roomState = createRoomState(room.id, room.quizId, room.code);
@@ -67,57 +90,74 @@ async function onJoinRoom(io: Server, socket: Socket, mq: RabbitMQService, paylo
     try {
       const queue = await mq.subscribeToRoom(roomState.roomId, (event, data) => {
         // Reemitir evento para todos os clientes conectados NESTE servidor
-        io.to(`room:${roomState.roomId}`).emit(event, data);
+        const message = createMessage(event, data);
+        wsServer.broadcastToRoom(roomState.roomId, message);
       });
       roomState.rabbitMQQueue = queue;
-      console.log(`[WS] Subscribed to RabbitMQ for room ${roomState.roomId}`);
+      console.log(`[GameController] Subscribed to RabbitMQ for room ${roomState.roomId}`);
     } catch (error) {
-      console.error(`[WS] Failed to subscribe to RabbitMQ:`, error);
+      console.error(`[GameController] Failed to subscribe to RabbitMQ:`, error);
     }
   }
 
   const isFirstPlayer = roomState.players.size === 0;
   if (isFirstPlayer) {
-    setHost(roomState, socket.id);
+    setHost(roomState, clientId);
   }
 
   const player: Player = {
-    socketId: socket.id,
+    clientId,
+    socketId: clientId, // Para compatibilidade
     playerId: nanoid(8),
     score: 0,
     displayName
   };
 
   addPlayer(roomState, player);
-  socket.join(`room:${roomState.roomId}`);
+  
+  // Adicionar cliente à sala no RoomManager
+  wsServer.getRoomManager().joinRoom(clientId, roomState.roomId);
 
-  socket.emit("room:joined", {
+  // Atualizar informações do cliente no ConnectionManager
+  wsServer.getConnectionManager().updateClient(clientId, {
+    roomId: roomState.roomId,
+    playerId: player.playerId,
+    displayName: displayName,
+  });
+
+  // Enviar confirmação de entrada
+  wsServer.sendToClient(clientId, createMessage(MessageType.ROOM_JOINED, {
     roomId: roomState.roomId,
     code: roomState.code,
     playerId: player.playerId,
-    isHost: isHost(roomState, socket.id)
-  });
+    isHost: isHost(roomState, clientId)
+  }));
 
-  await broadcastPlayers(io, mq, roomState);
+  await broadcastPlayers(wsServer, mq, roomState);
 }
 
-async function onHostStart(io: Server, socket: Socket, mq: RabbitMQService, roomId: string) {
-  const roomState = getRoomState(roomId);
+async function onHostStart(
+  wsServer: GameWebSocketServer, 
+  mq: RabbitMQService, 
+  clientId: string, 
+  data: StartGamePayload
+) {
+  const roomState = getRoomState(data.roomId);
   if (!roomState) {
-    return socket.emit("error", { message: "room not found" });
+    return wsServer.sendToClient(clientId, createErrorMessage("room not found"));
   }
 
-  if (!isHost(roomState, socket.id)) {
-    return socket.emit("error", { message: "only host can start game" });
+  if (!isHost(roomState, clientId)) {
+    return wsServer.sendToClient(clientId, createErrorMessage("only host can start game"));
   }
 
   const quiz = await getQuiz(roomState.quizId);
   if (!quiz) {
-    return socket.emit("error", { message: "quiz not found" });
+    return wsServer.sendToClient(clientId, createErrorMessage("quiz not found"));
   }
 
   if (!quiz.questions || quiz.questions.length === 0) {
-    return socket.emit("error", { message: "quiz has no questions" });
+    return wsServer.sendToClient(clientId, createErrorMessage("quiz has no questions"));
   }
 
   roomState.status = "running";
@@ -130,21 +170,25 @@ async function onHostStart(io: Server, socket: Socket, mq: RabbitMQService, room
   });
 
   setTimeout(() => {
-    startNextQuestion(io, mq, roomState);
+    startNextQuestion(wsServer, mq, roomState);
   }, 1000);
 }
 
-async function startNextQuestion(io: Server, mq: RabbitMQService, room: RoomState) {
+async function startNextQuestion(
+  wsServer: GameWebSocketServer, 
+  mq: RabbitMQService, 
+  room: RoomState
+) {
   const quiz = room.quiz;
   
   if (!quiz || room.questionIndex >= quiz.questions.length) {
-    await finishGame(io, mq, room);
+    await finishGame(wsServer, mq, room);
     return;
   }
 
   const q = quiz.questions[room.questionIndex];
   if (!q) {
-    await finishGame(io, mq, room);
+    await finishGame(wsServer, mq, room);
     return;
   }
 
@@ -161,13 +205,17 @@ async function startNextQuestion(io: Server, mq: RabbitMQService, room: RoomStat
   });
 
   room.questionTimer = setTimeout(() => {
-    endQuestion(io, mq, room);
+    endQuestion(wsServer, mq, room);
   }, q.timeLimitSeconds * 1000);
 
   room.questionIndex++;
 }
 
-async function endQuestion(io: Server, mq: RabbitMQService, room: RoomState) {
+async function endQuestion(
+  wsServer: GameWebSocketServer, 
+  mq: RabbitMQService, 
+  room: RoomState
+) {
   if (room.questionTimer) {
     clearTimeout(room.questionTimer);
     room.questionTimer = null;
@@ -179,10 +227,15 @@ async function endQuestion(io: Server, mq: RabbitMQService, room: RoomState) {
     correctIndex: room.currentQuestion?.correctIndex
   });
 
-  setTimeout(() => startNextQuestion(io, mq, room), 5000);
+  setTimeout(() => startNextQuestion(wsServer, mq, room), 5000);
 }
 
-async function onPlayerAnswer(io: Server, socket: Socket, mq: RabbitMQService, payload: any) {
+async function onPlayerAnswer(
+  wsServer: GameWebSocketServer, 
+  mq: RabbitMQService, 
+  clientId: string, 
+  payload: AnswerQuestionPayload
+) {
   const { roomId, questionId, selectedIndex, timeMs } = payload;
   const room = getRoomState(roomId);
   
@@ -192,7 +245,7 @@ async function onPlayerAnswer(io: Server, socket: Socket, mq: RabbitMQService, p
   const question = room.currentQuestion;
   if (!question || question.id !== questionId) return;
 
-  const player = room.players.get(socket.id);
+  const player = room.players.get(clientId);
   if (!player || player.answeredCurrent) return;
 
   const isCorrect = selectedIndex === question.correctIndex;
@@ -203,13 +256,13 @@ async function onPlayerAnswer(io: Server, socket: Socket, mq: RabbitMQService, p
 
   player.answeredCurrent = true;
 
-  socket.emit("game:answer_result", {
+  wsServer.sendToClient(clientId, createMessage(MessageType.ANSWER_RESULT, {
     correct: isCorrect,
     points,
     correctIndex: question.correctIndex
-  });
+  }));
 
-  await broadcastLeaderboard(io, mq, room);
+  await broadcastLeaderboard(wsServer, mq, room);
 
   const allAnswered = listPlayers(room).every(p => p.answeredCurrent);
   if (allAnswered && room.questionTimer) {
@@ -217,12 +270,16 @@ async function onPlayerAnswer(io: Server, socket: Socket, mq: RabbitMQService, p
     room.questionTimer = null;
     
     setTimeout(() => {
-      endQuestion(io, mq, room);
+      endQuestion(wsServer, mq, room);
     }, 1000);
   }
 }
 
-async function broadcastPlayers(io: Server, mq: RabbitMQService, room: RoomState) {
+async function broadcastPlayers(
+  wsServer: GameWebSocketServer, 
+  mq: RabbitMQService, 
+  room: RoomState
+) {
   const players = listPlayers(room).map(p => ({
     playerId: p.playerId,
     displayName: p.displayName,
@@ -233,7 +290,11 @@ async function broadcastPlayers(io: Server, mq: RabbitMQService, room: RoomState
   await mq.publishRoomEvent(room.roomId, 'room:player_list', { players });
 }
 
-async function broadcastLeaderboard(io: Server, mq: RabbitMQService, room: RoomState) {
+async function broadcastLeaderboard(
+  wsServer: GameWebSocketServer, 
+  mq: RabbitMQService, 
+  room: RoomState
+) {
   const leaderboard = listPlayers(room)
     .map(p => ({ playerId: p.playerId, displayName: p.displayName, score: p.score }))
     .sort((a, b) => b.score - a.score);
@@ -242,11 +303,16 @@ async function broadcastLeaderboard(io: Server, mq: RabbitMQService, room: RoomS
   await mq.publishRoomEvent(room.roomId, 'game:leaderboard', { leaderboard });
 }
 
-async function broadcastHostChange(io: Server, mq: RabbitMQService, room: RoomState, newHostSocketId: string) {
-  const newHost = room.players.get(newHostSocketId);
+async function broadcastHostChange(
+  wsServer: GameWebSocketServer, 
+  mq: RabbitMQService, 
+  room: RoomState, 
+  newHostClientId: string
+) {
+  const newHost = room.players.get(newHostClientId);
   if (!newHost) return;
   
-  console.log(`[WS] Host transferred to ${newHost.displayName} in room ${room.roomId}`);
+  console.log(`[GameController] Host transferred to ${newHost.displayName} in room ${room.roomId}`);
   
   // Publicar no RabbitMQ
   await mq.publishRoomEvent(room.roomId, 'room:host_changed', {
@@ -255,16 +321,20 @@ async function broadcastHostChange(io: Server, mq: RabbitMQService, room: RoomSt
   });
   
   // Emitir localmente com informação de isHost para cada jogador
-  for (const [socketId, player] of room.players) {
-    io.to(socketId).emit("room:host_changed", {
+  for (const [clientId, player] of room.players) {
+    wsServer.sendToClient(clientId, createMessage(MessageType.HOST_CHANGED, {
       newHostPlayerId: newHost.playerId,
       newHostDisplayName: newHost.displayName,
-      isHost: socketId === newHostSocketId
-    });
+      isHost: clientId === newHostClientId
+    }));
   }
 }
 
-async function finishGame(io: Server, mq: RabbitMQService, room: RoomState) {
+async function finishGame(
+  wsServer: GameWebSocketServer, 
+  mq: RabbitMQService, 
+  room: RoomState
+) {
   room.status = "finished";
   
   if (room.questionTimer) {
@@ -280,32 +350,36 @@ async function finishGame(io: Server, mq: RabbitMQService, room: RoomState) {
   await mq.publishRoomEvent(room.roomId, 'game:finished', { leaderboard });
 }
 
-function onDisconnect(io: Server, socket: Socket, mq: RabbitMQService) {
-  console.log("[WS] disconnected:", socket.id);
+async function onDisconnect(
+  wsServer: GameWebSocketServer, 
+  mq: RabbitMQService, 
+  clientId: string
+) {
+  console.log("[GameController] Client disconnected:", clientId);
   
   const roomManager = require("../services/roomManager");
   
   for (const room of roomManager.getAllRooms()) {
-    if (room.players.has(socket.id)) {
-      const newHostSocketId = removePlayer(room, socket.id);
-      console.log(`[WS] Player removed from room ${room.roomId}`);
+    if (room.players.has(clientId)) {
+      const newHostClientId = removePlayer(room, clientId);
+      console.log(`[GameController] Player removed from room ${room.roomId}`);
       
-      if (newHostSocketId) {
-        broadcastHostChange(io, mq, room, newHostSocketId);
+      if (newHostClientId) {
+        await broadcastHostChange(wsServer, mq, room, newHostClientId);
       }
       
-      broadcastPlayers(io, mq, room);
+      await broadcastPlayers(wsServer, mq, room);
       
       if (room.players.size === 0) {
         // Unsubscribe do RabbitMQ
         if (room.rabbitMQQueue) {
           mq.unsubscribe(room.rabbitMQQueue).catch(err => 
-            console.error('[WS] Failed to unsubscribe:', err)
+            console.error('[GameController] Failed to unsubscribe:', err)
           );
         }
         
         roomManager.deleteRoom(room.roomId);
-        console.log(`[WS] Empty room ${room.roomId} deleted`);
+        console.log(`[GameController] Empty room ${room.roomId} deleted`);
       }
     }
   }
